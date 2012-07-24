@@ -139,4 +139,5 @@ if __name__ == "__main__":
     bot = TwitterBot()
     while True:
         bot.tweet()
-        sleep_minutes(60)
+        sleep_time = 30 + random.randint(0, 300)
+        sleep_minutes(sleep_time)
