@@ -1,0 +1,7 @@
+setup_env.sh
+bin/
+lib/
+\#*\#
+distribute-*
+include/
+.Python

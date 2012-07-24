@@ -1,0 +1,1 @@
+worker: python kinda_newsy.py

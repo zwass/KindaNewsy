@@ -1,0 +1,4 @@
+requests==0.10.8
+tweepy==1.8
+beautifulsoup4==4.1.0
+lxml==2.3.4
