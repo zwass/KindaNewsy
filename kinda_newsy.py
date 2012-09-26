@@ -15,13 +15,17 @@ TWITTER_CONSUMER_KEY = os.environ.get('TWITTER_CONSUMER_KEY')
 TWITTER_CONSUMER_SECRET = os.environ.get('TWITTER_CONSUMER_SECRET')
 TWITTER_ACCESS_KEY = os.environ.get('TWITTER_ACCESS_KEY')
 TWITTER_ACCESS_SECRET = os.environ.get('TWITTER_ACCESS_SECRET')
-2
+
+
 class MarkovGenerator:
     """Uses first order Markov Chains to generate new text from seed text
 
     Tries to create more coherent text by remembering which words
     began sentences in the original text, and using those for
     generated sentences."""
+
+    #Words that shouldn't end a sentence
+    NOSTOP_WORDS = ["mr.", "ms.", "dr."]
 
     def __init__(self, text):
         self.text = text
@@ -51,7 +55,8 @@ class MarkovGenerator:
         output = ""
         word = random.choice(self.openers)
         i = 0
-        while len(output) + len(word) < min_length or word[-1] != ".":
+        while (len(output) + len(word) < min_length or word[-1] != "." or
+               word.lower() in self.NOSTOP_WORDS):
             output += word + " "
             try:
                 word = random.choice(self.mappings[word])
@@ -101,6 +106,8 @@ class TopArticlesGetter:
 
     A valid API key must be provided"""
     def __init__(self, api_key):
+        if not api_key or len(api_key) == 0:
+            raise Exception("Must set NYT_API_KEY in env")
         self.request_string =  MOSTVIEWED_URL % (api_key)
 
     def get_article_list(self):
@@ -114,6 +121,15 @@ class TopArticlesGetter:
 class TwitterBot:
     """Deals with the tweeting side of things"""
     def __init__(self):
+        if not TWITTER_CONSUMER_KEY or len(TWITTER_CONSUMER_KEY) == 0:
+            raise Exception("Must set TWITTER_CONSUMER_KEY in env")
+        if not TWITTER_CONSUMER_SECRET or len(TWITTER_CONSUMER_SECRET) == 0:
+            raise Exception("Must set TWITTER_CONSUMER_SECRET in env")
+        if not TWITTER_ACCESS_KEY or len(TWITTER_ACCESS_KEY) == 0:
+            raise Exception("Must set TWITTER_ACCESS_KEY in env")
+        if not TWITTER_ACCESS_SECRET or len(TWITTER_ACCESS_SECRET) == 0:
+            raise Exception("Must set TWITTER_ACCESS_SECRET in env")
+
         auth = tweepy.OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
         auth.set_access_token(TWITTER_ACCESS_KEY, TWITTER_ACCESS_SECRET)
         self._api = tweepy.API(auth)
@@ -130,6 +146,7 @@ class TwitterBot:
                     tweet_contents = generator.generate_text()
             except:
                 tweet_contents = None
+        #print tweet_contents
         self._api.update_status(tweet_contents)
 
 def sleep_minutes(minutes):
