@@ -5,6 +5,8 @@ import json
 import time
 import sys
 
+from collections import defaultdict
+
 from bs4 import BeautifulSoup
 import requests
 import tweepy
@@ -31,26 +33,20 @@ class MarkovGenerator(object):
 
     def __init__(self, text):
         self.text = text
-        self.mappings = {}
+        self.mappings = defaultdict(list)
         self.openers = []
         self._generate_mappings()
 
     def _generate_mappings(self):
         """Generates the markov chain using input text"""
         words = self.text.split()
-        for i in range(len(words) - 1):
-            word = words[i].strip()
-            next_word = words[i + 1].strip()
-
+        for word, next_word in zip(words, words[1:]):
             #Check whether this is a sentence opener
             if word[-1] == ".":
                 self.openers.append(next_word)
 
             #add it to our markov mapping
-            if word in self.mappings:
-                self.mappings[word].append(next_word)
-            else:
-                self.mappings[word] = [next_word]
+            self.mappings[word].append(next_word)
 
     def generate_text(self, min_length=100,):
         """Generates text from the markov chain mappings"""
