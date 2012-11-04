@@ -3,12 +3,14 @@ import os
 import re
 import json
 import time
+import sys
 
 from bs4 import BeautifulSoup
 import requests
 import tweepy
 
-MOSTVIEWED_URL = "http://api.nytimes.com/svc/mostpopular/v2/mostviewed/all-sections/1.json?api-key=%s"
+MOSTVIEWED_URL = """http://api.nytimes.com/svc/mostpopular/v2/mostviewed/\
+all-sections/1.json?api-key=%s"""
 
 NYT_API_KEY = os.environ.get('NYT_API_KEY')
 TWITTER_CONSUMER_KEY = os.environ.get('TWITTER_CONSUMER_KEY')
@@ -17,7 +19,7 @@ TWITTER_ACCESS_KEY = os.environ.get('TWITTER_ACCESS_KEY')
 TWITTER_ACCESS_SECRET = os.environ.get('TWITTER_ACCESS_SECRET')
 
 
-class MarkovGenerator:
+class MarkovGenerator(object):
     """Uses first order Markov Chains to generate new text from seed text
 
     Tries to create more coherent text by remembering which words
@@ -38,7 +40,7 @@ class MarkovGenerator:
         words = self.text.split()
         for i in range(len(words) - 1):
             word = words[i].strip()
-            next_word = words[i+1].strip()
+            next_word = words[i + 1].strip()
 
             #Check whether this is a sentence opener
             if word[-1] == ".":
@@ -67,27 +69,29 @@ class MarkovGenerator:
         output += word
         return output
 
-class TimesArticle:
+
+class TimesArticle(object):
     """Class for retrieving and parsing NYT articles"""
     def __init__(self, data):
         self.url = data['url']
         self.keywords = data['adx_keywords'].split(";")
-        self.text = None
+        self._text = None
 
-    def get_text(self):
+    @property
+    def text(self):
         """Returns the text of the article, with as much HTML stripped as
         possible
 
-        If this article has already been retrieved, returns the cached version"""
-        if self.text:
-            return self.text
+        Retrieves the full article text if not already done"""
+        if self._text:
+            return self._text
         else:
             article_request = requests.get(self.url)
             if article_request.status_code != requests.codes.ok:
                 article_request.raise_for_status()
             article_html = article_request.content
-            self.text = self._get_article_body(article_html)
-            return self.text
+            self._text = self._get_article_body(article_html)
+            return self._text
 
     def _get_article_body(self, article_html):
         """Extract the article body text from the full html"""
@@ -100,15 +104,14 @@ class TimesArticle:
         return article_body
 
 
-
-class TopArticlesGetter:
+class TopArticlesGetter(object):
     """Retrieves top articles using the NYT API
 
     A valid API key must be provided"""
     def __init__(self, api_key):
         if not api_key or len(api_key) == 0:
             raise Exception("Must set NYT_API_KEY in env")
-        self.request_string =  MOSTVIEWED_URL % (api_key)
+        self.request_string = MOSTVIEWED_URL % (api_key)
 
     def get_article_list(self):
         """Returns a list of TimesArticle objects for the top articles"""
@@ -116,11 +119,28 @@ class TopArticlesGetter:
         if r.status_code != requests.codes.ok:
             r.raise_for_status()
         rdata = json.loads(r.text)
-        return [TimesArticle(article_data) for article_data in rdata['results']]
+        return [TimesArticle(article_data)
+                for article_data
+                in rdata['results']]
 
-class TwitterBot:
+
+class MockAPI(object):
+    """A mock twitter API that just prints to stdout"""
+    def update_status(self, status):
+        print "Mock tweeting:"
+        print status
+
+
+class TwitterBot(object):
     """Deals with the tweeting side of things"""
     def __init__(self):
+        try:
+            self.create_api()
+        except:
+            print "Couldn't create API:", sys.exc_info()
+            self._api = MockAPI()
+
+    def create_api(self):
         if not TWITTER_CONSUMER_KEY or len(TWITTER_CONSUMER_KEY) == 0:
             raise Exception("Must set TWITTER_CONSUMER_KEY in env")
         if not TWITTER_CONSUMER_SECRET or len(TWITTER_CONSUMER_SECRET) == 0:
@@ -130,7 +150,8 @@ class TwitterBot:
         if not TWITTER_ACCESS_SECRET or len(TWITTER_ACCESS_SECRET) == 0:
             raise Exception("Must set TWITTER_ACCESS_SECRET in env")
 
-        auth = tweepy.OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
+        auth = tweepy.OAuthHandler(TWITTER_CONSUMER_KEY,
+                                   TWITTER_CONSUMER_SECRET)
         auth.set_access_token(TWITTER_ACCESS_KEY, TWITTER_ACCESS_SECRET)
         self._api = tweepy.API(auth)
 
@@ -140,7 +161,7 @@ class TwitterBot:
         while tweet_contents is None:
             try:
                 source = random.choice(articles)
-                generator = MarkovGenerator(source.get_text())
+                generator = MarkovGenerator(source.text)
                 tweet_contents = generator.generate_text()
                 while len(tweet_contents) > 140:
                     tweet_contents = generator.generate_text()
@@ -149,6 +170,7 @@ class TwitterBot:
         #print tweet_contents
         self._api.update_status(tweet_contents)
 
+
 def sleep_minutes(minutes):
     time.sleep(minutes * 60)
 
@@ -156,5 +178,5 @@ if __name__ == "__main__":
     bot = TwitterBot()
     while True:
         bot.tweet()
-        sleep_time = 30 + random.randint(0, 300)
+        sleep_time = random.randint(30, 300)
         sleep_minutes(sleep_time)
