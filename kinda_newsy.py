@@ -48,20 +48,16 @@ class MarkovGenerator(object):
             #add it to our markov mapping
             self.mappings[word].append(next_word)
 
-    def generate_text(self, min_length=100,):
+    def generate_text(self, min_length=100):
         """Generates text from the markov chain mappings"""
         output = ""
         word = random.choice(self.openers)
-        i = 0
-        while (len(output) + len(word) < min_length or word[-1] != "." or
-               word.lower() in self.NOSTOP_WORDS):
+        while (len(output) + len(word) < min_length
+               or word[-1] != "."
+               or word.lower() in self.NOSTOP_WORDS):
             output += word + " "
-            try:
-                word = random.choice(self.mappings[word])
-            except KeyError:
-                #there was no string following this
-                word = random.choice(self.mappings.keys())
-            i += 1
+            choices = self.mappings.get(word, self.mappings.keys())
+            word = random.choice(choices)
         output += word
         return output
 
